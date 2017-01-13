@@ -1,0 +1,24 @@
+# Models
+
+*.caffemodel
+
+# Compiled/cached Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporaries
+.ipynb_checkpoints/
+/datasets/*.tar.gz
+/datasets/*/
+!/datasets/*.prototxt
+/nets/*.prototxt
+
+# config
+config.yml
+snapshot/kitti/*
+*.swp
+*.ipynb
+
+# results
+*.png
