@@ -66,7 +66,9 @@ class KittiSegDataLayer(caffe.Layer):
         # make eval deterministic
         if 'train' not in self.split:
             self.random = False
-        random.seed(self.seed)
+
+        if self.random:
+            random.seed(self.seed)
 
     def reshape(self, bottom, top):
         # load image

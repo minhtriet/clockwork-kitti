@@ -3,6 +3,7 @@ import glob
 import numpy as np
 import PIL
 from PIL import Image
+import pdb
 
 class youtube:
     def __init__(self, data_path):
@@ -60,6 +61,7 @@ class youtube:
         print "Opening label {} {} {}".format(class_, vid, shot, idx)
         label = Image.open('{}/youtube_masks/{}/data/{}/shots/{}/labels/{:0>5d}.jpg'.format(self.dir, class_, vid, shot, int(idx)))
         label = self.resize(label, label=True)
+        pdb.set_trace()
         return label
 
     def resize(self, im, label=False):

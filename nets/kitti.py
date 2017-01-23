@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import numpy as np
 
@@ -12,31 +13,36 @@ class kitti:
         self.dir = os.path.join(data_path, 'datasets')
         self.mean = (104.00698793, 116.66876762, 122.67891434) # imagenet mean
         self.MAX_DIM = 500.0  # match PASCAL VOC training data
-        self.label_thresh = 15
-        palette = [    
-             0,     0,     0,
-           128,     0,     0,
-             0,   128,      0,
-           128,   128,      0,
-             0,     0,    128,
-           128,     0,    128,
-             0,   128,    128,
-           128,   128,    128,
-            64,     0,      0,
-           192,     0,      0,
-            64,   128,      0,
-           192,   128,      0,
-            64,     0,    128,
-           192,     0,    128,
-            64,   128,    128,
-           192,   128,    128,
-             0,    64,      0,
-           128,    64,      0,
-             0,   192,      0,
-           128,   192,      0,
-             0,    64,    128,
-           128,    64,    128 ] 
-        self.kt_palette = ImagePalette.ImagePalette(palette=palette, size=len(palette))
+        sys.path.insert(0, '{}/x/cityscapes/scripts/helpers/'.format(os.path.dirname(self.dir)))
+        labels = __import__('labels')
+        labels_and_ids = [(l.name, l.trainId) for l in labels.labels if l.trainId >= 0 and l.trainId < 255]
+        self.classes = [l[0] for l in sorted(labels_and_ids, key=lambda x: x[1])]  # classes in ID order == network output order
+        self.id2trainId = {label.id: label.trainId for label in labels.labels}  # dictionary mapping from raw IDs to train IDs
+        self.trainId2color = {label.trainId: label.color for label in labels.labels}  # dictionary mapping train IDs to colors as 3-tuples
+   #     self.kt_palette = [[  0,   0,   0],
+   #    [128,   0,   0],
+   #    [  0,   0, 128],
+   #    [128,   0, 128],
+   #    [  0, 128,   0],
+   #    [128, 128,   0],
+   #    [  0, 128, 128],
+   #    [128, 128, 128],
+   #    [ 64,   0,   0],
+   #    [192,   0,   0],
+   #    [ 64,   0, 128],
+   #    [192,   0, 128],
+   #    [ 64, 128,   0],
+   #    [192, 128,   0],
+   #    [ 64, 128, 128],
+   #    [192, 128, 128],
+   #    [  0,   0,  64],
+   #    [128,   0,  64],
+   #    [  0,   0, 192],
+   #    [128,   0, 192],
+   #    [  0, 128,  64],
+   #    [128, 128,  64]]
+ 
+        #self.kt_palette = ImagePalette.ImagePalette(palette=palette, size=len(palette))
  
     def list_vids(self, split):
         scenes = [os.path.basename(f) for f in glob.glob('{}/data_road/{}/image_2/*'.format(self.dir, split))]
@@ -70,8 +76,9 @@ class kitti:
         # change color to fit new layer
         im = self.resize(im, True)
         im = self.change_color(im, (255, 0, 0), (0, 0, 0))
-        im = self.change_color(im, (255, 0, 255), (0,64,128))
+        im = self.change_color(im, (255, 255, 0), (0,64,128))
         im = im.convert('P')
+        im.putpalette(self.kt_palette) 
         im = np.array(im, dtype=np.uint8)
         return im
 
@@ -104,17 +111,30 @@ class kitti:
         in_ = in_.transpose((2, 0, 1))
         return in_
 
-    def palette(self, label_im):
+    def kt_palette(self, label_im):
         '''
         Transfer the VOC color palette to an output mask
         '''
         if label_im.ndim == 3:
             label_im = label[0]
-        label = Image.fromarray(label_im, mode='P')
-        label.palette = self.kt_palette
-        return label
+        color = np.empty((label_im.shape[0], label_im.shape[1], 3))
+        for k in np.unique(label_im):
+            color[label_im == k, :] = self.kt_palette[k]
+        return color
 
     def to_voc_label(self, label, class_, voc_classes):
         label[label == 1] = 21
+        label = label[np.newaxis, ...]
         return label
 
+    def palette(self, label):
+
+        '''
+        Map trainIds to colors as specified in labels.py
+        '''
+        if label.ndim == 3:
+            label= label[0]
+        color = np.empty((label.shape[0], label.shape[1], 3))
+        for k, v in self.trainId2color.iteritems():
+            color[label == k, :] = v
+        return color

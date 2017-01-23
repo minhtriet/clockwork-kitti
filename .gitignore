@@ -13,7 +13,7 @@ __pycache__/
 /datasets/*/
 !/datasets/*.prototxt
 /nets/*.prototxt
-
+/x
 # config
 config.yml
 snapshot/kitti/*

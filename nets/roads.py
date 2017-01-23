@@ -21,6 +21,7 @@ class Road:
 
     def list_frames(self, vid):
         f = [os.path.basename(f) for f in glob.glob('{}/road/{}/image_03/data/*'.format(self.dir, vid))]
+        f.sort()
         return f
 
     def load_image(self, vid, idx):
