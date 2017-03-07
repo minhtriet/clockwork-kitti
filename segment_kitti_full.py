@@ -50,24 +50,19 @@ def adaptive_clockwork(thresh):
     for f in KT.list_vids(split):
         is_first = True
         num_frames += 1 # index the total number of frames
-        if is_first: # push the 10 frame lag through the net
-            im = KT.load_image(split, f)
-            _ = run_net.segrun(net, KT.preprocess(im))
-            prev_fts = net.blobs['score_pool4'].data[0].copy()
-            is_first = False
+        im = KT.load_image(split, f)
+        _ = run_net.segrun(net, KT.preprocess(im))
+        prev_fts = net.blobs['score_pool4'].data[0].copy()
 
-        # Run to pool4 on current frame
         im = KT.load_image(split, f)	
         run_net.feed_net(net, KT.preprocess(im))
         net.forward(start='conv1_1', end='score_pool4')
         curr_fts = net.blobs['score_pool4'].data[0].copy()
 
-        # Decide whether or not to update to fc7
         d = sm_diff(prev_fts, curr_fts)
-        if sm_diff(prev_fts, curr_fts) >= thresh: # push through rest of net
-            net.forward(start='conv5_1', end='upscore2')
-            prev_fts = net.blobs['score_pool4'].data[0].copy()
-            num_update_frames += 1
+        net.forward(start='conv5_1', end='upscore2')
+        prev_fts = net.blobs['score_pool4'].data[0].copy()
+        num_update_frames += 1
 
         # Compute full merge score
         net.forward(start='score_pool4c')
@@ -78,7 +73,6 @@ def adaptive_clockwork(thresh):
         f = f.replace("um_","um_lane_")
         f = f.replace("uu_","uu_road_")
         result = KT.palette(out)
-#        result = misc.imresize(result, (375, 1242))
         misc.imsave(f, result)
 #        hist += score_util.fast_hist(label.flatten(), out.flatten(), n_cl)
 #

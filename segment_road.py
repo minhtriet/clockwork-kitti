@@ -10,13 +10,15 @@ import numpy as np
 from scipy import misc
 
 import caffe
-from nets.kitti import kitti
+from nets.roads import Road
 
 from datasets.cityscapes import cityscapes
 
 from lib import run_net
 from lib import score_util
 from lib import plot_util
+
+import time
 
 #plt.rcParams['image.cmap'] = 'gray'
 #plt.rcParams['image.interpolation'] = 'nearest'
@@ -25,7 +27,7 @@ from lib import plot_util
 caffe.set_device(0)
 caffe.set_mode_gpu()
 
-KT = kitti()
+KT = Road()
 
 n_cl = 19
 
@@ -34,8 +36,6 @@ net = caffe.Net('nets/stage-cityscapes-fcn8s.prototxt',
                 caffe.TEST)
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-
-split = 'testing'
 
 def sm_diff(prev_scores, scores):
     prev_seg = prev_scores.argmax(axis=0).astype(np.uint8).copy()
@@ -47,17 +47,21 @@ def adaptive_clockwork(thresh):
     hist = np.zeros((n_cl, n_cl))
     num_frames = 0
     num_update_frames = 0
-    for f in KT.list_vids(split):
-        is_first = True
+    vid = KT.list_vids()[1]
+    tic = time.clock()
+    is_first = True
+    for f in KT.list_frames(vid):
         num_frames += 1 # index the total number of frames
         if is_first: # push the 10 frame lag through the net
-            im = KT.load_image(split, f)
+            im = KT.load_image(vid, f)
             _ = run_net.segrun(net, KT.preprocess(im))
+            mintoc = time.clock()
             prev_fts = net.blobs['score_pool4'].data[0].copy()
             is_first = False
+            print "!!!!!!!!! %f" % (tic-mintoc)
 
         # Run to pool4 on current frame
-        im = KT.load_image(split, f)	
+        im = KT.load_image(vid, f)	
         run_net.feed_net(net, KT.preprocess(im))
         net.forward(start='conv1_1', end='score_pool4')
         curr_fts = net.blobs['score_pool4'].data[0].copy()
@@ -72,21 +76,10 @@ def adaptive_clockwork(thresh):
         # Compute full merge score
         net.forward(start='score_pool4c')
         out = net.blobs['score'].data[0].argmax(axis=0).astype(np.uint8)
+        misc.imsave(f, KT.palette(out))
+    toc = time.clock()
+    print 'Adaptive Clockwork: Threshold', thresh, ' Updated {:d}/{:d} frames ({:2.1f}%)'.format(num_update_frames, num_frames, 100.0*num_update_frames/num_frames)
+    print tic - toc
 
-        label = KT.load_label(split, f)[0]
-        f = f.replace("umm_","umm_road_")
-        f = f.replace("um_","um_lane_")
-        f = f.replace("uu_","uu_road_")
-        result = KT.palette(out)
-#        result = misc.imresize(result, (375, 1242))
-        misc.imsave(f, result)
-#        hist += score_util.fast_hist(label.flatten(), out.flatten(), n_cl)
-#
-#    acc, cl_acc, mean_iu, fw_iu = score_util.get_scores(hist)
-#    print 'Adaptive Clockwork: Threshold', thresh, ' Updated {:d}/{:d} frames ({:2.1f}%)'.format(num_update_frames, num_frames, 100.0*num_update_frames/num_frames)
-#    print 'acc\t\t cl acc\t\t mIU\t\t fwIU'
-#    print '{:f}\t {:f}\t {:f}\t {:f}\t'.format(100*acc, 100*cl_acc, 100*mean_iu, 100*fw_iu)
-#    return acc, cl_acc, mean_iu, fw_iu
-
-adaptive_clockwork(0.1)
+adaptive_clockwork(0.05)
 

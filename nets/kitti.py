@@ -4,7 +4,7 @@ import glob
 import numpy as np
 
 import PIL
-from PIL import Image, ImagePalette
+from PIL import Image
 
 import pdb
 
@@ -18,31 +18,7 @@ class kitti:
         labels_and_ids = [(l.name, l.trainId) for l in labels.labels if l.trainId >= 0 and l.trainId < 255]
         self.classes = [l[0] for l in sorted(labels_and_ids, key=lambda x: x[1])]  # classes in ID order == network output order
         self.id2trainId = {label.id: label.trainId for label in labels.labels}  # dictionary mapping from raw IDs to train IDs
-        self.trainId2color = {label.trainId: label.color for label in labels.labels}  # dictionary mapping train IDs to colors as 3-tuples
-   #     self.kt_palette = [[  0,   0,   0],
-   #    [128,   0,   0],
-   #    [  0,   0, 128],
-   #    [128,   0, 128],
-   #    [  0, 128,   0],
-   #    [128, 128,   0],
-   #    [  0, 128, 128],
-   #    [128, 128, 128],
-   #    [ 64,   0,   0],
-   #    [192,   0,   0],
-   #    [ 64,   0, 128],
-   #    [192,   0, 128],
-   #    [ 64, 128,   0],
-   #    [192, 128,   0],
-   #    [ 64, 128, 128],
-   #    [192, 128, 128],
-   #    [  0,   0,  64],
-   #    [128,   0,  64],
-   #    [  0,   0, 192],
-   #    [128,   0, 192],
-   #    [  0, 128,  64],
-   #    [128, 128,  64]]
- 
-        #self.kt_palette = ImagePalette.ImagePalette(palette=palette, size=len(palette))
+        self.id2color = {label.id: label.color for label in labels.labels}  # dictionary mapping train IDs to colors as 3-tuples
  
     def list_vids(self, split):
         scenes = [os.path.basename(f) for f in glob.glob('{}/data_road/{}/image_2/*'.format(self.dir, split))]
@@ -64,11 +40,11 @@ class kitti:
         areas = (red == origin_color[0]) & (blue == origin_color[1]) & (green == origin_color[2])
         data[..., :-1][areas.T] = new_color # Transpose back needed
 
-        im2 = Image.fromarray(data)
+        im2 = Image.fromarray(data).convert('RGB')
         return im2 
 
 
-    def load_label(self, split, idx, palette):
+    def load_label(self, split, idx):
         idx = idx.replace("umm_","umm_road_")
         idx = idx.replace("um_","um_lane_")
         idx = idx.replace("uu_","uu_road_")
@@ -76,11 +52,13 @@ class kitti:
         # change color to fit new layer
         im = self.resize(im, True)
         im = self.change_color(im, (255, 0, 0), (0, 0, 0))
-        im = self.change_color(im, (255, 255, 0), (0,64,128))
-        im = im.convert('P')
-        im.putpalette(self.kt_palette) 
-        im = np.array(im, dtype=np.uint8)
-        return im
+        im = np.array(im)
+        # im = self.change_color(im, (255, 255, 0), (128,64,128))   # road color in cityscape
+        label = np.zeros((im.shape[0], im.shape[1]))
+        mask = (im==[0,0,0]).all(axis=2)
+        label[mask == False] = 7
+        label = label[np.newaxis, ...]
+        return label
 
     def resize(self, im, label=False):
         dims = np.array(im).shape
@@ -122,19 +100,13 @@ class kitti:
             color[label_im == k, :] = self.kt_palette[k]
         return color
 
-    def to_voc_label(self, label, class_, voc_classes):
-        label[label == 1] = 21
-        label = label[np.newaxis, ...]
-        return label
-
     def palette(self, label):
-
         '''
         Map trainIds to colors as specified in labels.py
         '''
         if label.ndim == 3:
             label= label[0]
         color = np.empty((label.shape[0], label.shape[1], 3))
-        for k, v in self.trainId2color.iteritems():
+        for k, v in self.id2color.iteritems():
             color[label == k, :] = v
         return color

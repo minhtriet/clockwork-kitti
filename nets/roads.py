@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import numpy as np
 
@@ -12,20 +13,25 @@ class Road:
         self.dir = os.path.join(data_path, 'datasets')
         self.mean = (104.00698793, 116.66876762, 122.67891434) # imagenet mean
         self.MAX_DIM = 500.0  # match PASCAL VOC training data
-        self.label_thresh = 15
-        self.classes = ['road']
+        sys.path.insert(0, '{}/x/cityscapes/scripts/helpers/'.format(os.path.dirname(self.dir)))
+        labels = __import__('labels')
+        labels_and_ids = [(l.name, l.trainId) for l in labels.labels if l.trainId >= 0 and l.trainId < 255]
+        self.classes = [l[0] for l in sorted(labels_and_ids, key=lambda x: x[1])]  # classes in ID order == network output order
+        self.id2trainId = {label.id: label.trainId for label in labels.labels}  # dictionary mapping from raw IDs to train IDs
+        self.id2color = {label.id: label.color for label in labels.labels}  # dictionary mapping train IDs to colors as 3-tuples
+ 
 
     def list_vids(self):
-        scenes = [os.path.basename(f) for f in glob.glob('{}/road/*'.format(self.dir))]
+        scenes = [os.path.basename(f) for f in glob.glob('{}/road/2011_09_26/*'.format(self.dir))]
         return scenes 
 
     def list_frames(self, vid):
-        f = [os.path.basename(f) for f in glob.glob('{}/road/{}/image_03/data/*'.format(self.dir, vid))]
+        f = [os.path.basename(f) for f in glob.glob('{}/road/2011_09_26/{}/image_03/data/*'.format(self.dir, vid))]
         f.sort()
         return f
 
     def load_image(self, vid, idx):
-        im = Image.open('{}/road/{}/image_03/data/{}'.format(self.dir, vid, idx))
+        im = Image.open('{}/road/2011_09_26/{}/image_03/data/{}'.format(self.dir, vid, idx))
         im = self.resize(im, False)
         return im
 
@@ -58,20 +64,13 @@ class Road:
         in_ = in_.transpose((2, 0, 1))
         return in_
 
-    def palette(self, label_im):
+    def palette(self, label):
         '''
-        Transfer the VOC color palette to an output mask
+        Map trainIds to colors as specified in labels.py
         '''
-        if label_im.ndim == 3:
-            label_im = label[0]
-        label = Image.fromarray(label_im, mode='P')
-        label.palette = copy.copy(self.voc_palette)
-        return label
-
-    def to_voc_label(self, label, class_, voc_classes):
-        label = np.array(label, dtype=np.uint8)
-        label[label <= self.label_thresh] = 0
-        label[label > self.label_thresh] = voc_classes.index(class_)
-
-        return label
-
+        if label.ndim == 3:
+            label= label[0]
+        color = np.empty((label.shape[0], label.shape[1], 3))
+        for k, v in self.id2color.iteritems():
+            color[label == k, :] = v
+        return color

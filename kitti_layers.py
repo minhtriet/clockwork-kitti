@@ -79,7 +79,7 @@ class KittiSegDataLayer(caffe.Layer):
         im = KT.load_image(self.split, self.indices[self.idx])
         self.data = KT.preprocess(im)
         # load label
-        self.label = KT.to_voc_label(KT.load_label(self.split, self.indices[self.idx], PV.palette), "road", PV.classes)
+        self.label = KT.load_label(self.split, self.indices[self.idx])
 
         # reshape tops to fit (leading 1 is for batch dimension)
         top[0].reshape(1, *self.data.shape)
